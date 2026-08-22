@@ -1,4 +1,4 @@
-"""Config flow for OurGroceries Autocomplete."""
+"""Config flow for OurGroceries Sync."""
 import logging
 
 import voluptuous as vol
@@ -43,7 +43,7 @@ async def _test_login(username: str, password: str) -> str:
         return "cannot_connect"
 
 
-class OurGroceriesAutocompleteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class OurGroceriesSyncConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the initial setup config flow."""
 
     VERSION = 1

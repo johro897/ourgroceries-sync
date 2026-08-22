@@ -10,7 +10,7 @@
         }
       },
       "reauth_confirm": {
-        "title": "Reauthenticate OurGroceries Autocomplete",
+        "title": "Reauthenticate OurGroceries Sync",
         "description": "OurGroceries rejected the stored credentials — enter updated ones.",
         "data": {
           "username": "Email",
