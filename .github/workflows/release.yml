@@ -30,15 +30,15 @@ jobs:
           # loading entirely (not just a HACS-side prerelease label).
           VERSION="${VERSION#beta-}"
           jq --arg v "$VERSION" '.version = $v' \
-            custom_components/ourgroceries_autocomplete/manifest.json > tmp.json
-          mv tmp.json custom_components/ourgroceries_autocomplete/manifest.json
+            custom_components/ourgroceries_sync/manifest.json > tmp.json
+          mv tmp.json custom_components/ourgroceries_sync/manifest.json
 
       - name: Zip integration
         run: |
-          cd custom_components/ourgroceries_autocomplete
-          zip -r ../../ourgroceries_autocomplete.zip .
+          cd custom_components/ourgroceries_sync
+          zip -r ../../ourgroceries_sync.zip .
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.event.release.tag_name }}
-          files: ourgroceries_autocomplete.zip
+          files: ourgroceries_sync.zip

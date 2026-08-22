@@ -1,10 +1,12 @@
-"""Services for OurGroceries Autocomplete.
+"""Suggestions service for OurGroceries Sync.
 
-No background polling here on purpose. OurGroceries' own developer filed
+No background polling for the master list, on purpose — unlike the todo.*
+list sync in coordinator.py, which does need real polling since shopping
+lists change often. OurGroceries' own developer filed
 home-assistant/core#105700 against the official integration for hammering
 their (unofficial, tolerated) API with unnecessary polling — the fix they
 asked for was to only re-fetch when something actually changed. The master
-list this integration reads changes rarely (it's a person's list of known
+list this service reads changes rarely (it's a person's list of known
 grocery items), so instead of polling it on a timer, this service is called
 on-demand by a card and backed by a simple time-based cache — OurGroceries'
 API gets hit at most once per SUGGESTIONS_CACHE_SECONDS, integration-wide,
@@ -38,16 +40,17 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if not entries:
             return {"items": []}
 
-        entry_id, og = next(iter(entries.items()))
+        entry_id, coordinator = next(iter(entries.items()))
+        og = coordinator.og
 
         cached = cache.get(entry_id)
         if cached is not None:
             fetched_at, items = cached
             if time.monotonic() - fetched_at < SUGGESTIONS_CACHE_SECONDS:
-                _LOGGER.debug("ourgroceries_autocomplete: returning cached suggestions")
+                _LOGGER.debug("ourgroceries_sync: returning cached suggestions")
                 return {"items": items}
 
-        _LOGGER.debug("ourgroceries_autocomplete: fetching master list from OurGroceries")
+        _LOGGER.debug("ourgroceries_sync: fetching master list from OurGroceries")
         data = await og.get_master_list()
         raw_items = data.get("list", {}).get("items", [])
         items = sorted({item["name"] for item in raw_items if item.get("name")})

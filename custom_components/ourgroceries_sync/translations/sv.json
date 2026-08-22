@@ -10,7 +10,7 @@
         }
       },
       "reauth_confirm": {
-        "title": "Autentisera om OurGroceries Autocomplete",
+        "title": "Autentisera om OurGroceries Sync",
         "description": "OurGroceries avvisade de sparade uppgifterna — ange uppdaterade.",
         "data": {
           "username": "E-post",
