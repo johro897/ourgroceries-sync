@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Anslut till OurGroceries",
+        "description": "Ange e-postadress och lösenord för ditt OurGroceries-konto.",
+        "data": {
+          "username": "E-post",
+          "password": "Lösenord"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Autentisera om OurGroceries Autocomplete",
+        "description": "OurGroceries avvisade de sparade uppgifterna — ange uppdaterade.",
+        "data": {
+          "username": "E-post",
+          "password": "Lösenord"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kunde inte ansluta till OurGroceries. Försök igen om en stund.",
+      "invalid_auth": "OurGroceries avvisade e-postadressen eller lösenordet."
+    },
+    "abort": {
+      "already_configured": "Det här OurGroceries-kontot är redan konfigurerat.",
+      "reauth_successful": "Omautentisering lyckades."
+    }
+  }
+}

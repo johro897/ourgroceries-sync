@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to OurGroceries",
+        "description": "Enter your OurGroceries account email and password.",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate OurGroceries Autocomplete",
+        "description": "OurGroceries rejected the stored credentials — enter updated ones.",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to OurGroceries. Try again in a moment.",
+      "invalid_auth": "OurGroceries rejected the email or password."
+    },
+    "abort": {
+      "already_configured": "This OurGroceries account is already configured.",
+      "reauth_successful": "Reauthentication successful."
+    }
+  }
+}

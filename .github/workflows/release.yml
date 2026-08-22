@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to attach the zip to (e.g. 1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+
+      - name: Set manifest version from tag
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          # Beta tags (beta-X.Y) must still resolve to a bare X.Y for the
+          # manifest — HA's loader requires a SemVer/CalVer version string
+          # and rejects "beta-2.2" outright, blocking the integration from
+          # loading entirely (not just a HACS-side prerelease label).
+          VERSION="${VERSION#beta-}"
+          jq --arg v "$VERSION" '.version = $v' \
+            custom_components/ourgroceries_autocomplete/manifest.json > tmp.json
+          mv tmp.json custom_components/ourgroceries_autocomplete/manifest.json
+
+      - name: Zip integration
+        run: |
+          cd custom_components/ourgroceries_autocomplete
+          zip -r ../../ourgroceries_autocomplete.zip .
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+          files: ourgroceries_autocomplete.zip
