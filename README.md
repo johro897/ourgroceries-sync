@@ -39,7 +39,7 @@ If you're upgrading from **HA core's built-in OurGroceries integration**, you ca
 
 ### Shopping lists
 
-Once configured, each OurGroceries list appears as a `todo.*` entity, usable with Home Assistant's standard todo card, voice assistants, and the `todo.*` services — same as any other todo integration. If an item has a note in OurGroceries (e.g. "125g"), it's exposed as that item's standard `description` field — read-only for now, since the underlying API only supports setting a note when an item is created, not editing one afterward.
+Once configured, each OurGroceries list appears as a `todo.*` entity, usable with Home Assistant's standard todo card, voice assistants, and the `todo.*` services — same as any other todo integration. If an item has a note in OurGroceries (e.g. "125g"), it's exposed as that item's standard `description` field — read-only, since the underlying API only supports setting a note when an item is created, not editing one on an existing item (see "Adding an item with a note" below for the create-time path).
 
 ### Autocomplete suggestions
 
@@ -71,6 +71,21 @@ Returns:
 
 Category names come from your OurGroceries account's own categories, cached for 15 minutes for the same reason as suggestions (see below) — this integration doesn't invent or assign categories itself.
 
+### Adding an item with a note
+
+`todo.add_item` (the standard HA service) has no way to set a note — that would need this integration to declare `SET_DESCRIPTION_ON_ITEM`, which would also make HA offer description *editing* via `todo.update_item`, and there's no way to actually honor an edit to an existing item's note (the underlying API only supports setting one at creation). So note-on-create is its own service instead:
+
+```yaml
+service: ourgroceries_sync.add_item
+target:
+  entity_id: todo.groceries
+data:
+  item: Oat milk
+  note: 125g
+```
+
+`note` is optional — omit it for a plain add (equivalent to `todo.add_item`). Used by [ourgroceries-shopping-card](https://github.com/johro897/ourgroceries-shopping-card) when you click a suggestion that has a note attached.
+
 ## Why the master list isn't kept live-synced
 
 OurGroceries' own developer [filed a complaint against Home Assistant's built-in integration](https://github.com/home-assistant/core/issues/105700) in 2023 for causing "significant load on our servers" by polling too aggressively. The master list (used for autocomplete) is built to avoid that mistake entirely: there's no background polling coordinator for it. `get_suggestions` fetches from OurGroceries on demand and caches the result in memory for **15 minutes**, integration-wide — no matter how often the service is called (e.g. by multiple dashboard sessions), OurGroceries' API is hit at most once per 15-minute window. The master list changes rarely (it's your accumulated item history, not your active shopping list), so this staleness window is a non-issue in practice. Your shopping lists themselves (the `todo.*` entities) poll every 60 seconds, but only re-fetch a list's items if its contents actually changed since the last poll.
@@ -91,6 +106,9 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 - An OurGroceries account
 
 ## Changelog
+
+### 1.1.2
+- New `ourgroceries_sync.add_item` service to create an item with a note — found necessary when notes turned out not to carry through when a suggestion (which has one) was added via the standard `todo.add_item` service, which has no note field
 
 ### 1.1.1
 - `todo.*` items now carry OurGroceries' item `note` as the standard `description` field (e.g. shows as subtext in a card) — read-only for now, since the underlying API only supports setting a note at creation, not editing an existing item's note (see [ourgroceries-shopping-card#5](https://github.com/johro897/ourgroceries-shopping-card/issues/5))

@@ -34,3 +34,4 @@ CATEGORY_CACHE_SECONDS = 900  # 15 minutes
 # Services
 SERVICE_GET_SUGGESTIONS = "get_suggestions"
 SERVICE_GET_CATEGORIES = "get_categories"
+SERVICE_ADD_ITEM = "add_item"

@@ -22,6 +22,7 @@ from ourgroceries import OurGroceries
 from .const import (
     CATEGORY_CACHE_SECONDS,
     DOMAIN,
+    SERVICE_ADD_ITEM,
     SERVICE_GET_CATEGORIES,
     SERVICE_GET_SUGGESTIONS,
     SUGGESTIONS_CACHE_SECONDS,
@@ -50,6 +51,18 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if not entries:
             return None, None
         return next(iter(entries.items()))
+
+    def _resolve_entity_id(call: ServiceCall) -> str | None:
+        """Read a single targeted entity_id out of a service call's data."""
+        entity_id = call.data.get(ATTR_ENTITY_ID)
+        if isinstance(entity_id, list):
+            entity_id = entity_id[0] if entity_id else None
+        return entity_id or None
+
+    def _resolve_list_id(entity_id: str) -> str | None:
+        """Map a todo.* entity_id to its OurGroceries list_id via the entity registry."""
+        registry_entry = er.async_get(hass).async_get(entity_id)
+        return registry_entry.unique_id if registry_entry else None
 
     async def _category_names(entry_id: str, og: OurGroceries) -> dict[str, str]:
         """Return {category_id: category_name}, cached for CATEGORY_CACHE_SECONDS."""
@@ -109,9 +122,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         entity_id the way an entity-service response would be; the caller
         only ever targets one entity_id at a time anyway.
         """
-        entity_id = call.data.get(ATTR_ENTITY_ID)
-        if isinstance(entity_id, list):
-            entity_id = entity_id[0] if entity_id else None
+        entity_id = _resolve_entity_id(call)
         if not entity_id:
             return {"categories": {}}
 
@@ -119,8 +130,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if coordinator is None:
             return {"categories": {}}
 
-        registry_entry = er.async_get(hass).async_get(entity_id)
-        list_id = registry_entry.unique_id if registry_entry else None
+        list_id = _resolve_list_id(entity_id)
         if not list_id:
             return {"categories": {}}
 
@@ -137,6 +147,37 @@ def async_setup_services(hass: HomeAssistant) -> None:
         }
         return {"categories": categories}
 
+    async def add_item(call: ServiceCall) -> None:
+        """Create an item with a note, bypassing todo.add_item entirely.
+
+        HA's standard todo.add_item can only carry a note via the
+        description field, which requires declaring
+        SET_DESCRIPTION_ON_ITEM — and that feature gates todo.update_item's
+        description too, which this integration can't honor (the
+        underlying library has no way to edit a note on an existing item).
+        So note-on-create is exposed here instead, as its own service, only
+        used by a card when it actually has a note to attach (e.g. picking
+        a suggestion) — plain todo.add_item still works exactly as before
+        for everything else.
+        """
+        entity_id = _resolve_entity_id(call)
+        item_name = call.data.get("item")
+        if not entity_id or not item_name:
+            return
+
+        _, coordinator = _get_coordinator()
+        if coordinator is None:
+            return
+
+        list_id = _resolve_list_id(entity_id)
+        if not list_id:
+            return
+
+        await coordinator.og.add_item_to_list(
+            list_id, item_name, auto_category=True, note=call.data.get("note")
+        )
+        await coordinator.async_refresh()
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_GET_SUGGESTIONS,
@@ -149,3 +190,4 @@ def async_setup_services(hass: HomeAssistant) -> None:
         get_categories,
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(DOMAIN, SERVICE_ADD_ITEM, add_item)
