@@ -61,7 +61,16 @@ class OurGroceriesTodoListEntity(CoordinatorEntity[OurGroceriesCoordinator], Tod
             None
             if data is None
             else [
-                TodoItem(summary=i["name"], uid=i["id"], status=_completion_status(i))
+                TodoItem(
+                    summary=i["name"],
+                    uid=i["id"],
+                    status=_completion_status(i),
+                    # OurGroceries' own "note" surfaced via HA's standard
+                    # description field — read-only for now, see CLAUDE.md
+                    # ("Notes — read-only for now") for why this doesn't
+                    # declare SET_DESCRIPTION_ON_ITEM.
+                    description=i.get("note") or None,
+                )
                 for i in data["list"]["items"]
             ]
         )

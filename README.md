@@ -39,7 +39,7 @@ If you're upgrading from **HA core's built-in OurGroceries integration**, you ca
 
 ### Shopping lists
 
-Once configured, each OurGroceries list appears as a `todo.*` entity, usable with Home Assistant's standard todo card, voice assistants, and the `todo.*` services — same as any other todo integration.
+Once configured, each OurGroceries list appears as a `todo.*` entity, usable with Home Assistant's standard todo card, voice assistants, and the `todo.*` services — same as any other todo integration. If an item has a note in OurGroceries (e.g. "125g"), it's exposed as that item's standard `description` field — read-only for now, since the underlying API only supports setting a note when an item is created, not editing one afterward.
 
 ### Autocomplete suggestions
 
@@ -91,6 +91,9 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 - An OurGroceries account
 
 ## Changelog
+
+### 1.1.1
+- `todo.*` items now carry OurGroceries' item `note` as the standard `description` field (e.g. shows as subtext in a card) — read-only for now, since the underlying API only supports setting a note at creation, not editing an existing item's note (see [ourgroceries-shopping-card#5](https://github.com/johro897/ourgroceries-shopping-card/issues/5))
 
 ### 1.1.0
 - `get_suggestions` now returns each item's `note` alongside its name (e.g. "125g"), not just names — used by the shopping card to show subtext under suggestions
