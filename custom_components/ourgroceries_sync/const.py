@@ -25,5 +25,12 @@ LIST_SCAN_INTERVAL_SECONDS = 60
 # this without confirming OurGroceries' actual cap hasn't changed.
 DELETE_CONCURRENCY = 10
 
-# Service
+# Cache TTL for the categoryId -> name lookup used by get_categories.
+# Category names change about as rarely as the master list, so reuse the
+# same on-demand + long-cache approach — no background polling for this
+# either.
+CATEGORY_CACHE_SECONDS = 900  # 15 minutes
+
+# Services
 SERVICE_GET_SUGGESTIONS = "get_suggestions"
+SERVICE_GET_CATEGORIES = "get_categories"

@@ -43,7 +43,7 @@ Once configured, each OurGroceries list appears as a `todo.*` entity, usable wit
 
 ### Autocomplete suggestions
 
-Exposes one service: `ourgroceries_sync.get_suggestions`. Call it from a template, automation, or (typically) from [ourgroceries-shopping-card](https://github.com/johro897/ourgroceries-shopping-card) to get back a list of item names from your OurGroceries master list:
+Exposes `ourgroceries_sync.get_suggestions`. Call it from a template, automation, or (typically) from [ourgroceries-shopping-card](https://github.com/johro897/ourgroceries-shopping-card) to get back item names (with an optional note, e.g. "125g", if OurGroceries has one on file) from your OurGroceries master list:
 
 ```yaml
 service: ourgroceries_sync.get_suggestions
@@ -51,8 +51,25 @@ service: ourgroceries_sync.get_suggestions
 
 Returns:
 ```json
-{ "items": ["Bananas", "Milk", "Oat milk", "..."] }
+{ "items": [{ "name": "Bananas", "note": null }, { "name": "Oat milk", "note": "125g" }] }
 ```
+
+### Category names
+
+Exposes `ourgroceries_sync.get_categories`, targeted at one of this integration's own `todo.*` entities, returning the category name for each item currently on that list (used by the shopping card to group items):
+
+```yaml
+service: ourgroceries_sync.get_categories
+target:
+  entity_id: todo.groceries
+```
+
+Returns:
+```json
+{ "categories": { "<item uid>": "Dairy", "<item uid>": "Produce" } }
+```
+
+Category names come from your OurGroceries account's own categories, cached for 15 minutes for the same reason as suggestions (see below) — this integration doesn't invent or assign categories itself.
 
 ## Why the master list isn't kept live-synced
 
@@ -74,6 +91,10 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 - An OurGroceries account
 
 ## Changelog
+
+### 1.1.0
+- `get_suggestions` now returns each item's `note` alongside its name (e.g. "125g"), not just names — used by the shopping card to show subtext under suggestions
+- New `ourgroceries_sync.get_categories` service, entity-targeted at one of this integration's `todo.*` entities, returning a category name per item — used by the shopping card to group the list view by category
 
 ### 1.0.0
 - Renamed from OurGroceries Autocomplete — now a full replacement for HA core's built-in OurGroceries integration, not just a companion to it
