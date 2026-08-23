@@ -109,6 +109,9 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 
 ## Changelog
 
+### 1.1.4
+- Fixed a crash in `ourgroceries_sync.add_item`: targeting a `todo.*` entity that isn't actually one of this integration's own lists (e.g. testing against a different todo source) used to send a bad list ID straight to OurGroceries' API and crash with an unhandled `aiohttp.ContentTypeError`. Now validated up front and fails cleanly with a normal service error instead.
+
 ### 1.1.3
 - Added a **Configure** option (Settings → Devices & Services → this integration → Configure) to update your OurGroceries email/password at any time, instead of only being able to change credentials when a reauth prompt fires
 

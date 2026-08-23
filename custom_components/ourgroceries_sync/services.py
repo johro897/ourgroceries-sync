@@ -16,6 +16,7 @@ import time
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from ourgroceries import OurGroceries
 
@@ -59,10 +60,22 @@ def async_setup_services(hass: HomeAssistant) -> None:
             entity_id = entity_id[0] if entity_id else None
         return entity_id or None
 
-    def _resolve_list_id(entity_id: str) -> str | None:
-        """Map a todo.* entity_id to its OurGroceries list_id via the entity registry."""
+    def _resolve_list_id(entity_id: str, coordinator) -> str | None:
+        """Map a todo.* entity_id to its OurGroceries list_id via the entity registry.
+
+        Returns None for anything that isn't actually one of THIS
+        integration's own lists — an entity_id with no registry entry, one
+        whose unique_id happens to not match any list the coordinator knows
+        about (e.g. a todo.* entity from a different integration entirely,
+        or a stale one). Checking against coordinator.data here, once, means
+        every caller gets this validation for free instead of only the ones
+        that happen to also do a dict lookup afterwards.
+        """
         registry_entry = er.async_get(hass).async_get(entity_id)
-        return registry_entry.unique_id if registry_entry else None
+        list_id = registry_entry.unique_id if registry_entry else None
+        if list_id is None or list_id not in coordinator.data:
+            return None
+        return list_id
 
     async def _category_names(entry_id: str, og: OurGroceries) -> dict[str, str]:
         """Return {category_id: category_name}, cached for CATEGORY_CACHE_SECONDS."""
@@ -130,16 +143,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if coordinator is None:
             return {"categories": {}}
 
-        list_id = _resolve_list_id(entity_id)
+        list_id = _resolve_list_id(entity_id, coordinator)
         if not list_id:
             return {"categories": {}}
 
-        list_data = coordinator.data.get(list_id)
-        if not list_data:
-            return {"categories": {}}
-
         names = await _category_names(entry_id, coordinator.og)
-        items = list_data.get("list", {}).get("items", [])
+        items = coordinator.data[list_id].get("list", {}).get("items", [])
         categories = {
             item["id"]: names.get(item["categoryId"], "")
             for item in items
@@ -163,19 +172,36 @@ def async_setup_services(hass: HomeAssistant) -> None:
         entity_id = _resolve_entity_id(call)
         item_name = call.data.get("item")
         if not entity_id or not item_name:
-            return
+            raise ServiceValidationError("item and entity_id are required")
 
         _, coordinator = _get_coordinator()
         if coordinator is None:
-            return
+            raise ServiceValidationError("OurGroceries Sync isn't set up")
 
-        list_id = _resolve_list_id(entity_id)
+        list_id = _resolve_list_id(entity_id, coordinator)
         if not list_id:
-            return
+            # Not one of our own lists — a todo.* entity from a different
+            # integration, or a stale/invalid one. Fail loudly rather than
+            # silently doing nothing: the card's caller already falls back
+            # to plain todo.add_item when this raises (see its
+            # _addItemWithNote), so a clean error here is what makes that
+            # fallback actually trigger instead of just also going quiet.
+            raise ServiceValidationError(
+                f"{entity_id} is not a list managed by OurGroceries Sync"
+            )
 
-        await coordinator.og.add_item_to_list(
-            list_id, item_name, auto_category=True, note=call.data.get("note")
-        )
+        try:
+            await coordinator.og.add_item_to_list(
+                list_id, item_name, auto_category=True, note=call.data.get("note")
+            )
+        except Exception as err:
+            # The underlying library calls resp.json() unconditionally, so
+            # a non-JSON error response from OurGroceries (e.g. a 400 for a
+            # bad list_id) surfaces as an unhandled aiohttp ContentTypeError
+            # rather than anything HA-recognized. Wrap it so this shows up
+            # as a normal service error, not a raw traceback in the logs.
+            raise HomeAssistantError(f"Could not add item to OurGroceries: {err}") from err
+
         await coordinator.async_refresh()
 
     hass.services.async_register(
