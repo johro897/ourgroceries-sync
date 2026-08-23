@@ -16,6 +16,14 @@
           "username": "Email",
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Update OurGroceries Sync credentials",
+        "description": "Change the email or password this integration uses to log in to OurGroceries.",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -24,7 +32,8 @@
     },
     "abort": {
       "already_configured": "This OurGroceries account is already configured.",
-      "reauth_successful": "Reauthentication successful."
+      "reauth_successful": "Reauthentication successful.",
+      "reconfigure_successful": "Credentials updated."
     }
   }
 }

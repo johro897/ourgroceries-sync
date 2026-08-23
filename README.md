@@ -33,6 +33,8 @@ It's also a chance to fix a couple of things found while reading the built-in in
 
 **Settings → Devices & Services → Add Integration → OurGroceries Sync**, then enter your OurGroceries email and password. One `todo.*` entity is created per OurGroceries shopping list.
 
+Changed your OurGroceries password (or want to switch accounts)? **Settings → Devices & Services → OurGroceries Sync → Configure** — no need to remove and re-add the integration.
+
 If you're upgrading from **HA core's built-in OurGroceries integration**, you can remove it after setting this one up — its `todo.*` entities will need to be re-bound in any dashboards/automations that reference them, since the entity IDs will differ. If you're upgrading from the earlier **OurGroceries Autocomplete** (this project's previous, suggestions-only incarnation), see "Upgrading" below.
 
 ## Usage
@@ -106,6 +108,9 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 - An OurGroceries account
 
 ## Changelog
+
+### 1.1.3
+- Added a **Configure** option (Settings → Devices & Services → this integration → Configure) to update your OurGroceries email/password at any time, instead of only being able to change credentials when a reauth prompt fires
 
 ### 1.1.2
 - New `ourgroceries_sync.add_item` service to create an item with a note — found necessary when notes turned out not to carry through when a suggestion (which has one) was added via the standard `todo.add_item` service, which has no note field
