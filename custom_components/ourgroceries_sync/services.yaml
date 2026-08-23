@@ -1,2 +1,25 @@
 get_suggestions:
   fields: {}
+get_categories:
+  target:
+    entity:
+      integration: ourgroceries_sync
+      domain: todo
+  fields: {}
+add_item:
+  target:
+    entity:
+      integration: ourgroceries_sync
+      domain: todo
+      supported_features:
+        - todo.TodoListEntityFeature.CREATE_TODO_ITEM
+  fields:
+    item:
+      required: true
+      example: "Bananas"
+      selector:
+        text:
+    note:
+      example: "125g"
+      selector:
+        text:

@@ -16,6 +16,14 @@
           "username": "E-post",
           "password": "Lösenord"
         }
+      },
+      "reconfigure": {
+        "title": "Uppdatera OurGroceries Sync-uppgifter",
+        "description": "Ändra e-postadressen eller lösenordet den här integrationen använder för att logga in på OurGroceries.",
+        "data": {
+          "username": "E-post",
+          "password": "Lösenord"
+        }
       }
     },
     "error": {
@@ -24,7 +32,8 @@
     },
     "abort": {
       "already_configured": "Det här OurGroceries-kontot är redan konfigurerat.",
-      "reauth_successful": "Omautentisering lyckades."
+      "reauth_successful": "Omautentisering lyckades.",
+      "reconfigure_successful": "Uppgifterna uppdaterade."
     }
   }
 }

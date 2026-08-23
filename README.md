@@ -33,17 +33,19 @@ It's also a chance to fix a couple of things found while reading the built-in in
 
 **Settings → Devices & Services → Add Integration → OurGroceries Sync**, then enter your OurGroceries email and password. One `todo.*` entity is created per OurGroceries shopping list.
 
+Changed your OurGroceries password (or want to switch accounts)? **Settings → Devices & Services → OurGroceries Sync → Configure** — no need to remove and re-add the integration.
+
 If you're upgrading from **HA core's built-in OurGroceries integration**, you can remove it after setting this one up — its `todo.*` entities will need to be re-bound in any dashboards/automations that reference them, since the entity IDs will differ. If you're upgrading from the earlier **OurGroceries Autocomplete** (this project's previous, suggestions-only incarnation), see "Upgrading" below.
 
 ## Usage
 
 ### Shopping lists
 
-Once configured, each OurGroceries list appears as a `todo.*` entity, usable with Home Assistant's standard todo card, voice assistants, and the `todo.*` services — same as any other todo integration.
+Once configured, each OurGroceries list appears as a `todo.*` entity, usable with Home Assistant's standard todo card, voice assistants, and the `todo.*` services — same as any other todo integration. If an item has a note in OurGroceries (e.g. "125g"), it's exposed as that item's standard `description` field — read-only, since the underlying API only supports setting a note when an item is created, not editing one on an existing item (see "Adding an item with a note" below for the create-time path).
 
 ### Autocomplete suggestions
 
-Exposes one service: `ourgroceries_sync.get_suggestions`. Call it from a template, automation, or (typically) from [ourgroceries-shopping-card](https://github.com/johro897/ourgroceries-shopping-card) to get back a list of item names from your OurGroceries master list:
+Exposes `ourgroceries_sync.get_suggestions`. Call it from a template, automation, or (typically) from [ourgroceries-shopping-card](https://github.com/johro897/ourgroceries-shopping-card) to get back item names (with an optional note, e.g. "125g", if OurGroceries has one on file) from your OurGroceries master list:
 
 ```yaml
 service: ourgroceries_sync.get_suggestions
@@ -51,8 +53,40 @@ service: ourgroceries_sync.get_suggestions
 
 Returns:
 ```json
-{ "items": ["Bananas", "Milk", "Oat milk", "..."] }
+{ "items": [{ "name": "Bananas", "note": null }, { "name": "Oat milk", "note": "125g" }] }
 ```
+
+### Category names
+
+Exposes `ourgroceries_sync.get_categories`, targeted at one of this integration's own `todo.*` entities, returning the category name for each item currently on that list (used by the shopping card to group items):
+
+```yaml
+service: ourgroceries_sync.get_categories
+target:
+  entity_id: todo.groceries
+```
+
+Returns:
+```json
+{ "categories": { "<item uid>": "Dairy", "<item uid>": "Produce" } }
+```
+
+Category names come from your OurGroceries account's own categories, cached for 15 minutes for the same reason as suggestions (see below) — this integration doesn't invent or assign categories itself.
+
+### Adding an item with a note
+
+`todo.add_item` (the standard HA service) has no way to set a note — that would need this integration to declare `SET_DESCRIPTION_ON_ITEM`, which would also make HA offer description *editing* via `todo.update_item`, and there's no way to actually honor an edit to an existing item's note (the underlying API only supports setting one at creation). So note-on-create is its own service instead:
+
+```yaml
+service: ourgroceries_sync.add_item
+target:
+  entity_id: todo.groceries
+data:
+  item: Oat milk
+  note: 125g
+```
+
+`note` is optional — omit it for a plain add (equivalent to `todo.add_item`). Used by [ourgroceries-shopping-card](https://github.com/johro897/ourgroceries-shopping-card) when you click a suggestion that has a note attached.
 
 ## Why the master list isn't kept live-synced
 
@@ -75,12 +109,17 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 
 ## Changelog
 
-### 1.0.0
-- Renamed from OurGroceries Autocomplete — now a full replacement for HA core's built-in OurGroceries integration, not just a companion to it
-- `todo.*` entity per shopping list: create, update, and delete items, with delete concurrency bounded to stay under OurGroceries' rate limit (see home-assistant/core#179603)
-- Reauthentication flow now actually triggers on invalid/expired credentials
-- `get_suggestions` service unchanged: item names from your OurGroceries master list, with a 15-minute cache to keep API usage polite
-- English and Swedish translations for the config flow
+### 1.2.0 — First stable release
+
+Renamed from **OurGroceries Autocomplete** (suggestions-only) to a full replacement for HA core's built-in `ourgroceries` integration. Went through several pre-release betas (`beta-1.0.0` through `beta-1.1.4`, still published on the [releases page](https://github.com/johro897/ourgroceries-sync/releases) as history) before this first stable release:
+
+- `todo.*` entity per shopping list — create, update, delete, with delete concurrency bounded to stay under OurGroceries' rate limit (see [home-assistant/core#179603](https://github.com/home-assistant/core/issues/179603))
+- Reauthentication triggers correctly on invalid/expired credentials, plus a **Configure** option to update credentials any time, not just on failure
+- `get_suggestions` — item names and notes from your OurGroceries master list, 15-minute cache, no background polling
+- `get_categories` — category name per item on a list, for category-grouped card UIs
+- `add_item` — create an item with a note attached, since `todo.add_item` has no note field; validated against the wrong kind of entity fails cleanly rather than crashing
+- Item notes exposed via the standard `description` field
+- English and Swedish translations throughout
 
 ## License
 

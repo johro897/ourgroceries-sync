@@ -1,49 +1,106 @@
-"""Suggestions service for OurGroceries Sync.
+"""Suggestions and category-lookup services for OurGroceries Sync.
 
-No background polling for the master list, on purpose — unlike the todo.*
+No background polling for either of these, on purpose — unlike the todo.*
 list sync in coordinator.py, which does need real polling since shopping
 lists change often. OurGroceries' own developer filed
 home-assistant/core#105700 against the official integration for hammering
 their (unofficial, tolerated) API with unnecessary polling — the fix they
-asked for was to only re-fetch when something actually changed. The master
-list this service reads changes rarely (it's a person's list of known
-grocery items), so instead of polling it on a timer, this service is called
-on-demand by a card and backed by a simple time-based cache — OurGroceries'
-API gets hit at most once per SUGGESTIONS_CACHE_SECONDS, integration-wide,
-no matter how often the service is called.
+asked for was to only re-fetch when something actually changed. Both the
+master list and the category names change rarely, so instead of polling
+them on a timer, these services are called on-demand by a card and backed
+by a simple time-based cache — OurGroceries' API gets hit at most once per
+cache window, integration-wide, no matter how often the service is called.
 """
 import logging
 import time
 
+from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
+from ourgroceries import OurGroceries
 
-from .const import DOMAIN, SERVICE_GET_SUGGESTIONS, SUGGESTIONS_CACHE_SECONDS
+from .const import (
+    CATEGORY_CACHE_SECONDS,
+    DOMAIN,
+    SERVICE_ADD_ITEM,
+    SERVICE_GET_CATEGORIES,
+    SERVICE_GET_SUGGESTIONS,
+    SUGGESTIONS_CACHE_SECONDS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
-    """Register the get_suggestions service."""
+    """Register the get_suggestions and get_categories services."""
 
-    # {entry_id: (fetched_at_monotonic, [item names])}
-    cache: dict[str, tuple[float, list[str]]] = {}
+    # {entry_id: (fetched_at_monotonic, [{"name": ..., "note": ...}, ...])}
+    suggestions_cache: dict[str, tuple[float, list[dict]]] = {}
+    # {entry_id: (fetched_at_monotonic, {category_id: category_name})}
+    category_cache: dict[str, tuple[float, dict[str, str]]] = {}
 
-    async def get_suggestions(call: ServiceCall) -> ServiceResponse:
-        """Return known item names from the OurGroceries master list.
+    def _get_coordinator():
+        """Return the (entry_id, coordinator) for whichever entry is loaded.
 
-        Uses whichever configured entry is loaded — this integration only
-        supports one OurGroceries account in practice, so there's no
-        config_entry selector to keep the service simple to call.
+        This integration only supports one OurGroceries account in
+        practice, so there's no config_entry selector to keep these
+        services simple to call.
         """
         entries = hass.data.get(DOMAIN, {})
         if not entries:
-            return {"items": []}
+            return None, None
+        return next(iter(entries.items()))
 
-        entry_id, coordinator = next(iter(entries.items()))
+    def _resolve_entity_id(call: ServiceCall) -> str | None:
+        """Read a single targeted entity_id out of a service call's data."""
+        entity_id = call.data.get(ATTR_ENTITY_ID)
+        if isinstance(entity_id, list):
+            entity_id = entity_id[0] if entity_id else None
+        return entity_id or None
+
+    def _resolve_list_id(entity_id: str, coordinator) -> str | None:
+        """Map a todo.* entity_id to its OurGroceries list_id via the entity registry.
+
+        Returns None for anything that isn't actually one of THIS
+        integration's own lists — an entity_id with no registry entry, one
+        whose unique_id happens to not match any list the coordinator knows
+        about (e.g. a todo.* entity from a different integration entirely,
+        or a stale one). Checking against coordinator.data here, once, means
+        every caller gets this validation for free instead of only the ones
+        that happen to also do a dict lookup afterwards.
+        """
+        registry_entry = er.async_get(hass).async_get(entity_id)
+        list_id = registry_entry.unique_id if registry_entry else None
+        if list_id is None or list_id not in coordinator.data:
+            return None
+        return list_id
+
+    async def _category_names(entry_id: str, og: OurGroceries) -> dict[str, str]:
+        """Return {category_id: category_name}, cached for CATEGORY_CACHE_SECONDS."""
+        cached = category_cache.get(entry_id)
+        if cached is not None:
+            fetched_at, names = cached
+            if time.monotonic() - fetched_at < CATEGORY_CACHE_SECONDS:
+                return names
+
+        _LOGGER.debug("ourgroceries_sync: fetching category list from OurGroceries")
+        data = await og.get_category_items()
+        raw_items = data.get("list", {}).get("items", [])
+        names = {item["id"]: item["name"] for item in raw_items if item.get("id") and item.get("name")}
+
+        category_cache[entry_id] = (time.monotonic(), names)
+        return names
+
+    async def get_suggestions(call: ServiceCall) -> ServiceResponse:
+        """Return known item names (with notes) from the OurGroceries master list."""
+        entry_id, coordinator = _get_coordinator()
+        if coordinator is None:
+            return {"items": []}
         og = coordinator.og
 
-        cached = cache.get(entry_id)
+        cached = suggestions_cache.get(entry_id)
         if cached is not None:
             fetched_at, items = cached
             if time.monotonic() - fetched_at < SUGGESTIONS_CACHE_SECONDS:
@@ -53,10 +110,99 @@ def async_setup_services(hass: HomeAssistant) -> None:
         _LOGGER.debug("ourgroceries_sync: fetching master list from OurGroceries")
         data = await og.get_master_list()
         raw_items = data.get("list", {}).get("items", [])
-        items = sorted({item["name"] for item in raw_items if item.get("name")})
 
-        cache[entry_id] = (time.monotonic(), items)
+        # A name can appear more than once in principle — last one wins.
+        # The master list is meant to hold unique known item names, so this
+        # is a safety net, not an expected case.
+        by_name: dict[str, str | None] = {}
+        for item in raw_items:
+            name = item.get("name")
+            if not name:
+                continue
+            by_name[name] = item.get("note") or None
+
+        items = [{"name": name, "note": note} for name, note in sorted(by_name.items())]
+
+        suggestions_cache[entry_id] = (time.monotonic(), items)
         return {"items": items}
+
+    async def get_categories(call: ServiceCall) -> ServiceResponse:
+        """Return {item_uid: category_name} for the targeted todo.* entity's list.
+
+        Entity-targeted like todo.get_items, but registered as a plain
+        domain service (not an entity-platform service) since it isn't
+        backed by an HA entity of its own — so the response isn't keyed by
+        entity_id the way an entity-service response would be; the caller
+        only ever targets one entity_id at a time anyway.
+        """
+        entity_id = _resolve_entity_id(call)
+        if not entity_id:
+            return {"categories": {}}
+
+        entry_id, coordinator = _get_coordinator()
+        if coordinator is None:
+            return {"categories": {}}
+
+        list_id = _resolve_list_id(entity_id, coordinator)
+        if not list_id:
+            return {"categories": {}}
+
+        names = await _category_names(entry_id, coordinator.og)
+        items = coordinator.data[list_id].get("list", {}).get("items", [])
+        categories = {
+            item["id"]: names.get(item["categoryId"], "")
+            for item in items
+            if item.get("id") and item.get("categoryId")
+        }
+        return {"categories": categories}
+
+    async def add_item(call: ServiceCall) -> None:
+        """Create an item with a note, bypassing todo.add_item entirely.
+
+        HA's standard todo.add_item can only carry a note via the
+        description field, which requires declaring
+        SET_DESCRIPTION_ON_ITEM — and that feature gates todo.update_item's
+        description too, which this integration can't honor (the
+        underlying library has no way to edit a note on an existing item).
+        So note-on-create is exposed here instead, as its own service, only
+        used by a card when it actually has a note to attach (e.g. picking
+        a suggestion) — plain todo.add_item still works exactly as before
+        for everything else.
+        """
+        entity_id = _resolve_entity_id(call)
+        item_name = call.data.get("item")
+        if not entity_id or not item_name:
+            raise ServiceValidationError("item and entity_id are required")
+
+        _, coordinator = _get_coordinator()
+        if coordinator is None:
+            raise ServiceValidationError("OurGroceries Sync isn't set up")
+
+        list_id = _resolve_list_id(entity_id, coordinator)
+        if not list_id:
+            # Not one of our own lists — a todo.* entity from a different
+            # integration, or a stale/invalid one. Fail loudly rather than
+            # silently doing nothing: the card's caller already falls back
+            # to plain todo.add_item when this raises (see its
+            # _addItemWithNote), so a clean error here is what makes that
+            # fallback actually trigger instead of just also going quiet.
+            raise ServiceValidationError(
+                f"{entity_id} is not a list managed by OurGroceries Sync"
+            )
+
+        try:
+            await coordinator.og.add_item_to_list(
+                list_id, item_name, auto_category=True, note=call.data.get("note")
+            )
+        except Exception as err:
+            # The underlying library calls resp.json() unconditionally, so
+            # a non-JSON error response from OurGroceries (e.g. a 400 for a
+            # bad list_id) surfaces as an unhandled aiohttp ContentTypeError
+            # rather than anything HA-recognized. Wrap it so this shows up
+            # as a normal service error, not a raw traceback in the logs.
+            raise HomeAssistantError(f"Could not add item to OurGroceries: {err}") from err
+
+        await coordinator.async_refresh()
 
     hass.services.async_register(
         DOMAIN,
@@ -64,3 +210,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
         get_suggestions,
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_CATEGORIES,
+        get_categories,
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(DOMAIN, SERVICE_ADD_ITEM, add_item)
