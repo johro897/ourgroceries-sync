@@ -107,6 +107,23 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 - Home Assistant 2024.8 or newer (uses the `config_entry`-based `DataUpdateCoordinator` API)
 - An OurGroceries account
 
+## Troubleshooting
+
+**Setup fails with an invalid-login error**
+Double-check your OurGroceries email and password — this integration logs in independently of any other OurGroceries setup you may have (see "No relation to HA core's official integration" above), so credentials that work in the OurGroceries app or a different integration still need to be re-entered here.
+
+**Integration shows as needing reauthentication**
+OurGroceries rejected the stored credentials (e.g. after a password change). Follow the reauth prompt, or go to **Settings → Devices & Services → OurGroceries Sync → Configure** to update credentials any time, not just after a failure.
+
+**No shopping list entities after setup**
+Restart Home Assistant once after adding the integration. If lists still don't appear, confirm you're logged into the same OurGroceries account that owns the lists you expect to see.
+
+**Suggestions are missing an item you just added in OurGroceries, or a category name is out of date**
+Both are cached for 15 minutes integration-wide, by design (see "Why the master list isn't kept live-synced" above) — wait for the cache to expire, or restart Home Assistant to force a refresh immediately.
+
+**A note isn't attached when an item is added via automation/template**
+`todo.add_item` (the standard HA service) has no note field — use `ourgroceries_sync.add_item` with a `note` field instead, see "Adding an item with a note" above.
+
 ## Changelog
 
 ### 1.2.0 — First stable release
