@@ -13,7 +13,7 @@ This integration **replaces** Home Assistant's built-in [OurGroceries integratio
 
 It's also a chance to fix a couple of things found while reading the built-in integration's source as a reference:
 
-- **Unbounded concurrent deletes.** The built-in integration fires one request per item on bulk delete with no limit — a user with 550 done items sent 550 simultaneous requests in 3 seconds, which is exactly the kind of load OurGroceries' own developer has [asked Home Assistant integrations to avoid](https://github.com/home-assistant/core/issues/105700). OurGroceries now caps concurrent requests at 15/user and returns errors beyond that (see [home-assistant/core#179603](https://github.com/home-assistant/core/issues/179603), filed by OurGroceries' own developer, unaddressed at the time this was written). This integration bounds delete concurrency to stay well under that cap.
+- **Bulk deletes in one request.** Clearing a long list of crossed-off items used to mean one request per item — a user with 550 done items sent 550 simultaneous requests in 3 seconds, which is exactly the kind of load OurGroceries' own developer has [asked Home Assistant integrations to avoid](https://github.com/home-assistant/core/issues/105700) (see [home-assistant/core#179603](https://github.com/home-assistant/core/issues/179603), filed by OurGroceries' own developer). This integration sends all the deletes from one action as a single bulk request, using the `edit_items()` call that OurGroceries' developer added to the library for exactly this. Home Assistant's built-in integration adopted the same approach in [core#182402](https://github.com/home-assistant/core/pull/182402).
 - **Reauthentication.** This integration prompts for updated credentials if OurGroceries rejects them, instead of failing silently.
 
 ## Installation
@@ -125,6 +125,10 @@ Both are cached for 15 minutes integration-wide, by design (see "Why the master 
 `todo.add_item` (the standard HA service) has no note field — use `ourgroceries_sync.add_item` with a `note` field instead, see "Adding an item with a note" above.
 
 ## Changelog
+
+### 1.2.2 — Bulk delete in one request
+
+- Deleting items now sends one bulk request per action instead of one request per item (previously up to 10 at a time), using the `edit_items()` call added in `ourgroceries 1.6.0`. Clearing a long list of crossed-off items is a single call to OurGroceries ([#8](https://github.com/johro897/ourgroceries-sync/issues/8)).
 
 ### 1.2.1 — Align with ourgroceries 1.6.0
 
