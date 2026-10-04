@@ -4,6 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from ourgroceries import OurGroceries
 from ourgroceries.exceptions import InvalidLoginException
 
@@ -12,6 +13,8 @@ from .coordinator import OurGroceriesCoordinator
 from .services import async_setup_services
 
 PLATFORMS: list[Platform] = [Platform.TODO]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
