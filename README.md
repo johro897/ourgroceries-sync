@@ -126,7 +126,7 @@ Both are cached for 15 minutes integration-wide, by design (see "Why the master 
 
 ## Changelog
 
-### 1.2.2 — Bulk delete in one request (pre-release `beta-1.2.2`)
+### 1.2.2 — Bulk delete in one request
 
 - Deleting items now sends one bulk request per action instead of one request per item (previously up to 10 at a time), using the `edit_items()` call added in `ourgroceries 1.6.0`. Clearing a long list of crossed-off items is a single call to OurGroceries ([#8](https://github.com/johro897/ourgroceries-sync/issues/8)).
 
