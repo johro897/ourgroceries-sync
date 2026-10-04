@@ -128,7 +128,7 @@ Both are cached for 15 minutes integration-wide, by design (see "Why the master 
 
 ### 1.2.1 — Align with ourgroceries 1.6.0 (pre-release `beta-1.2.1`)
 
-- Updated the `ourgroceries` library pin from `1.5.4` to `1.6.0`, matching Home Assistant core (HA 2026.10). The new library version only adds a bulk-edit method, so nothing this integration uses changed. Fixes the failing Hassfest check ([#6](https://github.com/johro897/ourgroceries-sync/issues/6)).
+- The `ourgroceries` library requirement changed from the exact pin `1.5.4` to a minimum version, `>=1.6.0`, so it follows Home Assistant core (HA 2026.10 moved to `1.6.0`). The new library version only adds a bulk-edit method, so nothing this integration uses changed. Fixes the failing Hassfest check ([#6](https://github.com/johro897/ourgroceries-sync/issues/6)).
 - Checking off or unchecking an item now sends one request to OurGroceries instead of two: the no-op rename that used to precede every status change is skipped unless the name actually changed.
 - Declared the integration config-entry-only, which clears a Hassfest warning. No behaviour change.
 
