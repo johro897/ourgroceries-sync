@@ -90,10 +90,15 @@ class OurGroceriesTodoListEntity(CoordinatorEntity[OurGroceriesCoordinator], Tod
 
     async def async_update_todo_item(self, item: TodoItem) -> None:
         """Update a todo item."""
-        if item.summary:
-            items = self.coordinator.data[self._list_id]["list"]["items"]
-            category_id = next(i.get("categoryId") for i in items if i["id"] == item.uid)
-            await self.coordinator.og.change_item_on_list(self._list_id, item.uid, category_id, item.summary)
+        # HA's todo.update_item always passes the item's existing summary, even
+        # for a status-only change, so rename only when the name actually
+        # differs — otherwise every check-off sends a no-op rename first.
+        items = self.coordinator.data[self._list_id]["list"]["items"]
+        current = next(i for i in items if i["id"] == item.uid)
+        if item.summary and item.summary != current["name"]:
+            await self.coordinator.og.change_item_on_list(
+                self._list_id, item.uid, current.get("categoryId"), item.summary
+            )
         if item.status is not None:
             await self.coordinator.og.toggle_item_crossed_off(
                 self._list_id, item.uid, cross_off=item.status == TodoItemStatus.COMPLETED
