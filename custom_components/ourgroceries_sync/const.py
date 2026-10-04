@@ -18,13 +18,6 @@ SUGGESTIONS_CACHE_SECONDS = 900  # 15 minutes
 # in coordinator.py rather than by polling less often.
 LIST_SCAN_INTERVAL_SECONDS = 60
 
-# Cap on concurrent delete requests OurGroceries' API will accept per user
-# before returning 429 (see home-assistant/core#179603 — HA core's official
-# integration ignores this cap entirely and floods their servers on bulk
-# deletes). Keep comfortably under their stated limit of 15. Do not raise
-# this without confirming OurGroceries' actual cap hasn't changed.
-DELETE_CONCURRENCY = 10
-
 # Cache TTL for the categoryId -> name lookup used by get_categories.
 # Category names change about as rarely as the master list, so reuse the
 # same on-demand + long-cache approach — no background polling for this

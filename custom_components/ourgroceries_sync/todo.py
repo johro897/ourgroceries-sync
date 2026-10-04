@@ -1,5 +1,4 @@
 """Todo platform for OurGroceries Sync — one TodoListEntity per shopping list."""
-import asyncio
 import logging
 from typing import Any
 
@@ -13,8 +12,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from ourgroceries import make_delete_item_edit_record
 
-from .const import DELETE_CONCURRENCY, DOMAIN
+from .const import DOMAIN
 from .coordinator import OurGroceriesCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,17 +106,14 @@ class OurGroceriesTodoListEntity(CoordinatorEntity[OurGroceriesCoordinator], Tod
         await self.coordinator.async_refresh()
 
     async def async_delete_todo_items(self, uids: list[str]) -> None:
-        """Delete items, bounding concurrency to avoid OurGroceries' 429 cap.
+        """Delete all given items with a single bulk request.
 
-        See home-assistant/core#179603 — core's unbounded asyncio.gather over
-        every uid floods OurGroceries' servers and silently drops deletions
-        past their 15-req/user cap. Bound concurrency instead.
+        One request per item floods OurGroceries' servers on a large list
+        (home-assistant/core#179603), so send them as one edit instead.
         """
-        semaphore = asyncio.Semaphore(DELETE_CONCURRENCY)
-
-        async def _delete_one(uid: str) -> None:
-            async with semaphore:
-                await self.coordinator.og.remove_item_from_list(self._list_id, uid)
-
-        await asyncio.gather(*(_delete_one(uid) for uid in uids))
+        if not uids:
+            return
+        await self.coordinator.og.edit_items(
+            self._list_id, [make_delete_item_edit_record(uid) for uid in uids]
+        )
         await self.coordinator.async_refresh()
