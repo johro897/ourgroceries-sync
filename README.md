@@ -104,7 +104,7 @@ This project used to be suggestions-only (no shopping lists) under the name **Ou
 
 ## Requirements
 
-- Home Assistant 2024.8 or newer (uses the `config_entry`-based `DataUpdateCoordinator` API)
+- Home Assistant 2024.11 or newer (the config flow uses `_get_reauth_entry` / `_get_reconfigure_entry`)
 - An OurGroceries account
 
 ## Troubleshooting
